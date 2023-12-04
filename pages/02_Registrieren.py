@@ -18,8 +18,20 @@ st.set_page_config(
 )
 
 
+streamlit_style = """
+			<style>
+			@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@100&display=swap');
+
+			html, body, [class*="css"]  {
+			font-family: 'Roboto';
+			}
+			</style>
+			"""
+st.markdown(streamlit_style, unsafe_allow_html=True)
+
 hide_streamlit_style = """
             <style>
+            #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
             </style>
             """
