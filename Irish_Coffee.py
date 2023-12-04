@@ -70,10 +70,11 @@ def init_data():
 
 orders_df, users_df = init_data()
 
-def calculate_bac(user_weight, drinks_consumed, hours_since_first_drink):
+
+def calculate_bac(user_weight, drinks_consumed, minutes_since_first_drink):
     # Constants
     widmark_factor = 0.68
-    metabolism_rate = 0.015  # Average alcohol metabolism rate per hour
+    decay_rate_per_minute = 0.0016  # BAC decay rate per minute
 
     # Calculate total alcohol in grams
     total_alcohol_grams = 0
@@ -87,38 +88,49 @@ def calculate_bac(user_weight, drinks_consumed, hours_since_first_drink):
     raw_bac = (total_alcohol_grams / (body_weight_grams * widmark_factor)) * 100
 
     # Adjust for metabolism over time
-    adjusted_bac = max(raw_bac - (metabolism_rate * hours_since_first_drink), 0)
+    bac_decay = decay_rate_per_minute * minutes_since_first_drink
+    adjusted_bac = max(raw_bac - bac_decay, 0)
     return adjusted_bac
+
+
 
 def update_order_status_to_consumed():
     global orders_df, users_df
     now = datetime.now()
-    
+
     for index, order in orders_df.iterrows():
         if order['status'] == 'prepared':
             order_time = order['timestamp']
             if isinstance(order_time, str):
                 order_time = datetime.strptime(order_time, '%Y-%m-%d %H:%M:%S.%f')
-            if now - order_time > timedelta(minutes=10):
+
+            if now - order_time > timedelta(minutes=10):  # Check if 10 minutes have passed since the order was prepared
                 username = order['username']
                 user_info = users_df[users_df['username'] == username].iloc[0]
-                user_orders = orders_df[(orders_df['username'] == username) & (orders_df['status'] == 'consumed')]
                 
-                # Include the current drink in the calculation
-                current_drink = (order['volume_ml'], order['abv'])
-                all_drinks = [(drink['volume_ml'], drink['abv']) for idx, drink in user_orders.iterrows()] + [current_drink]
+                # Safeguard against missing drink details
+                drink_info = drinks.get(order['drink'], {})
+                volume_ml = drink_info.get('volume_ml', 0)  # Default to 0 if not specified
+                abv = drink_info.get('abv', 0)  # Default to 0 if not specified
 
-                # Calculate BAC
+                # Get all past consumed drinks for this user
+                user_orders = orders_df[(orders_df['username'] == username) & (orders_df['status'] == 'consumed')]
+                all_drinks = [(drink['volume_ml'], drink['abv']) for idx, drink in user_orders.iterrows()]
+                all_drinks.append((volume_ml, abv))  # Add the current drink to the list
+
+                # Find the time of the first drink
                 first_drink_time = min(user_orders['timestamp'], default=now)
-                hours_since_first_drink = (now - first_drink_time).total_seconds() / 3600.0
-                bac = calculate_bac(user_info['weight'], all_drinks, hours_since_first_drink)
+                minutes_since_first_drink = (now - first_drink_time).total_seconds() / 60.0  # Convert to minutes
+                bac = calculate_bac(user_info['weight'], all_drinks, minutes_since_first_drink)
 
-                # Update the order
+                # Update the order with the calculated BAC
                 orders_df.at[index, 'bac'] = bac
                 orders_df.at[index, 'status'] = 'consumed'
                 orders_df.at[index, 'consumed_time'] = now
 
     orders_df.to_excel('orders.xlsx', index=False)
+
+
 
 
 

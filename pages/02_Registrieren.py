@@ -65,11 +65,19 @@ with st.form("user_registration_form"):
 # Handle form submission
 if submit_button:
     if username and weight > 0 and age > 0:
-        new_user_data = {'username': username, 'weight': weight, 'age': age}
-        add_user_to_excel(new_user_data)
-        st.success(f"User {username} registered successfully!")
+        # Check if username already exists
+        users_df = pd.read_excel('users.xlsx')
+        if username in users_df['username'].values:
+            st.error(f"Username '{username}' already exists. Please choose a different username.")
+        else:
+            new_user_data = {'username': username, 'weight': weight, 'age': age}
+            add_user_to_excel(new_user_data)
+            st.success(f"User {username} registered successfully!")
+
     else:
-        st.error("Please fill in all the fields correctly.")
+        # Handle case where input data is not valid
+        st.error("Please enter a valid username, weight, and age.")
+
 
 # Optional: Display current users
 if st.checkbox("Show Registered Users"):
